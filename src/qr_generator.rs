@@ -4,6 +4,7 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 use tracing::info;
+use eframe::egui::ColorImage;
 
 pub struct QRGenerator {
     size: u32,
@@ -18,15 +19,32 @@ impl QRGenerator {
         }
     }
 
-    pub fn generate_qr_image(&self, text: &str) -> Result<Option<()>> {
+    pub fn generate_qr_image(&self, text: &str) -> Result<Option<ColorImage>> {
         if text.is_empty() {
             return Ok(None);
         }
 
-        // TODO: Implement proper image generation for egui
-        // For now, return None to allow compilation
-        info!("QR code generation requested for: {}", text);
-        Ok(None)
+        // Generate QR code
+        let code = QrCode::new(text)?;
+        
+        // Convert to image buffer
+        let image_buffer = self.qr_code_to_image(&code)?;
+        
+        // Convert to RGBA
+        let rgba_image = self.convert_to_rgba(&image_buffer)?;
+        
+        // Convert to egui ColorImage
+        let size = [rgba_image.width() as usize, rgba_image.height() as usize];
+        let pixels: Vec<egui::Color32> = rgba_image
+            .pixels()
+            .map(|pixel| {
+                egui::Color32::from_rgba_premultiplied(
+                    pixel[0], pixel[1], pixel[2], pixel[3]
+                )
+            })
+            .collect();
+        
+        Ok(Some(ColorImage { size, pixels }))
     }
 
     fn qr_code_to_image(&self, code: &QrCode) -> Result<ImageBuffer<Luma<u8>, Vec<u8>>> {
@@ -34,28 +52,6 @@ impl QRGenerator {
             .dark_color(Luma([0]))
             .light_color(Luma([255]))
             .build();
-
-        // Draw QR code
-        // for y in 0..width {
-        //     for x in 0..width {
-        //         let is_dark = code.render().get_bool(x as usize, y as usize);
-        //         let color = if is_dark { Luma([0]) } else { Luma([255]) };
-                
-        //         let start_x = (x + self.quiet_zone) * pixel_size;
-        //         let start_y = (y + self.quiet_zone) * pixel_size;
-                
-        //         for py in 0..pixel_size {
-        //             for px in 0..pixel_size {
-        //                 let image_x = start_x + px;
-        //                 let image_y = start_y + py;
-                        
-        //                 if image_x < self.size && image_y < self.size {
-        //                     image.put_pixel(image_x, image_y, color);
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
         
         Ok(image)
     }
@@ -116,5 +112,20 @@ impl QRGenerator {
             .build();
         
         Ok(svg_string)
+    }
+
+    pub fn print_qr_terminal(&self, text: &str) -> Result<()> {
+        if text.is_empty() {
+            return Err(anyhow::anyhow!("No text to generate QR code"));
+        }
+
+        let code = QrCode::new(text)?;
+        let string = code.render()
+            .dark_color('█')
+            .light_color(' ')
+            .build();
+        
+        println!("{}", string);
+        Ok(())
     }
 } 

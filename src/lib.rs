@@ -1,10 +1,12 @@
 pub mod app;
 pub mod qr_generator;
+pub mod qr_scanner;
 pub mod clipboard_handler;
 pub mod cli;
 
 pub use app::ClipboardQRApp;
 pub use qr_generator::QRGenerator;
+pub use qr_scanner::QRScanner;
 pub use clipboard_handler::ClipboardHandler;
 pub use cli::ClipboardQRCLI;
 
@@ -30,8 +32,7 @@ mod tests {
     fn test_qr_generator_with_valid_text() {
         let generator = QRGenerator::new();
         let result = generator.generate_qr_image("Hello, World!").unwrap();
-        // Currently returns None for compilation purposes
-        assert!(result.is_none());
+        assert!(result.is_some());
     }
 
     #[test]
@@ -41,6 +42,12 @@ mod tests {
         assert!(result.is_ok());
         let svg = result.unwrap();
         assert!(svg.contains("svg"));
+    }
+
+    #[test]
+    fn test_qr_scanner_creation() {
+        let scanner = QRScanner::new();
+        // Test that scanner can be created
     }
 
     #[test]

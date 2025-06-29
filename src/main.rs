@@ -4,6 +4,7 @@ use tracing::{info, error};
 
 mod app;
 mod qr_generator;
+mod qr_scanner;
 mod clipboard_handler;
 mod cli;
 
