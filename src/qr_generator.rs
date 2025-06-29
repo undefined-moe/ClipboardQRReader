@@ -7,13 +7,11 @@ use tracing::info;
 use eframe::egui::ColorImage;
 
 pub struct QRGenerator {
-    size: u32,
 }
 
 impl QRGenerator {
     pub fn new() -> Self {
         Self {
-            size: 300,
         }
     }
 
@@ -104,7 +102,7 @@ impl QRGenerator {
 
         let code = QrCode::new(text)?;
         let svg_string = code.render()
-            .min_dimensions(self.size, self.size)
+            .min_dimensions(300, 300)
             .dark_color(svg::Color("#000000"))
             .light_color(svg::Color("#ffffff"))
             .build();
@@ -123,7 +121,38 @@ impl QRGenerator {
             .light_color(' ')
             .build();
         
-        println!("{}", string);
+        // Convert to smaller Unicode blocks using half-block characters
+        let lines: Vec<&str> = string.lines().collect();
+        let mut small_string = String::new();
+        
+        // Process lines in pairs to create smaller blocks
+        for i in (0..lines.len()).step_by(2) {
+            let line1 = lines.get(i).unwrap_or(&"");
+            let line2 = lines.get(i + 1).unwrap_or(&"");
+            
+            let mut combined_line = String::new();
+            let max_len = line1.chars().count().max(line2.chars().count());
+            
+            for j in 0..max_len {
+                let c1 = line1.chars().nth(j).unwrap_or(' ');
+                let c2 = line2.chars().nth(j).unwrap_or(' ');
+                
+                let combined_char = match (c1, c2) {
+                    ('█', '█') => '█', // Full block
+                    ('█', ' ') => '▀', // Upper half block
+                    (' ', '█') => '▄', // Lower half block
+                    (' ', ' ') => ' ', // Space
+                    _ => ' ',          // Default to space
+                };
+                
+                combined_line.push(combined_char);
+            }
+            
+            small_string.push_str(&combined_line);
+            small_string.push('\n');
+        }
+        
+        println!("{}", small_string);
         Ok(())
     }
 } 

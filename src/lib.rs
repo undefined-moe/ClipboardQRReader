@@ -1,13 +1,11 @@
 pub mod qr_generator;
 pub mod qr_scanner;
 pub mod clipboard_handler;
-pub mod cli;
 pub mod global_state;
 
 pub use qr_generator::QRGenerator;
 pub use qr_scanner::QRScanner;
 pub use clipboard_handler::ClipboardHandler;
-pub use cli::ClipboardQRCLI;
 pub use global_state::GlobalClipboardState;
 
 #[cfg(test)]

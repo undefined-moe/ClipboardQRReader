@@ -13,8 +13,6 @@ use winapi::shared::windef::HWND;
 #[cfg(windows)]
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
 
-use crate::qr_scanner::QRScanner;
-
 #[derive(Debug, Clone)]
 pub enum ClipboardData {
     Text(String),
@@ -24,7 +22,6 @@ pub enum ClipboardData {
 
 pub struct ClipboardHandler {
     clipboard: Option<Clipboard>,
-    qr_scanner: QRScanner,
     last_hash: u64,
     last_check_time: SystemTime,
     #[cfg(any(windows, unix))]
@@ -57,7 +54,6 @@ impl ClipboardHandler {
 
         Self { 
             clipboard,
-            qr_scanner: QRScanner::new(),
             last_hash: 0,
             last_check_time: SystemTime::now(),
             #[cfg(any(windows, unix))]
@@ -250,28 +246,6 @@ impl ClipboardHandler {
         }
     }
 
-    pub fn get_text(&mut self) -> Result<String> {
-        match self.get_data()? {
-            ClipboardData::Text(text) => Ok(text),
-            ClipboardData::Image(_) => Ok("".to_string()),
-            ClipboardData::Empty => Ok("".to_string()),
-        }
-    }
-
-    pub fn detect_qr_in_image(&self, image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<Option<String>> {
-        info!("Attempting to detect QR code in clipboard image");
-        self.qr_scanner.scan_qr_from_rgba(image)
-    }
-
-    pub fn detect_multiple_qr_codes(&self, image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<Vec<String>> {
-        info!("Attempting to detect multiple QR codes in clipboard image");
-        self.qr_scanner.scan_multiple_qr_codes(image)
-    }
-
-    pub fn has_qr_code(&self, image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<bool> {
-        self.qr_scanner.has_qr_code(image)
-    }
-
     pub fn has_changed(&mut self) -> Result<bool> {
         let current_data = self.get_data()?;
         let mut hasher = DefaultHasher::new();
@@ -314,26 +288,6 @@ impl ClipboardHandler {
         // Fallback to polling
         if self.has_changed()? {
             Ok(Some(self.get_data()?))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn get_text_if_changed(&mut self) -> Result<Option<String>> {
-        if self.has_changed()? {
-            let data = self.get_data()?;
-            match data {
-                ClipboardData::Text(text) => Ok(Some(text)),
-                ClipboardData::Image(image) => {
-                    // Try to detect QR code in the image
-                    if let Some(qr_content) = self.detect_qr_in_image(&image)? {
-                        Ok(Some(qr_content))
-                    } else {
-                        Ok(Some("".to_string()))
-                    }
-                },
-                ClipboardData::Empty => Ok(Some("".to_string())),
-            }
         } else {
             Ok(None)
         }

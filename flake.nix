@@ -26,10 +26,10 @@
             rustTarget = "x86_64-pc-windows-gnu";
             nativeBuildInputs = pkgsCross: [
               pkgsCross.stdenv.cc
-              pkgsCross.windows.pthreads
+              # pkgsCross.windows.pthreads
             ];
             rustFlags = pkgsCross: [
-              "-C" "link-arg=-L${pkgsCross.windows.pthreads}/lib"
+              # "-C" "link-arg=-L${pkgsCross.windows.pthreads}/lib"
             ];
           };
         };
@@ -52,7 +52,6 @@
               extensions = [ "rust-src" "rust-analyzer" ];
               targets = [ buildTarget.rustTarget ];
             })
-            pkgsCross.stdenv.cc
           ];
 
           # Environment variables for cross-compilation
@@ -68,12 +67,19 @@
           buildInputs = with pkgs; [
             # Build tools
             pkg-config
-            cmake
             
             # System libraries
             openssl
             libxkbcommon
             wayland
+            glib
+            atk
+            gtk3
+            
+            # Tray icon dependencies
+            libappindicator
+            libayatana-appindicator
+            libnotify
             
             # Development tools
             cargo-watch
@@ -87,9 +93,8 @@
             
             # Documentation
             mdbook
-          ] ++ [
-            # Rust toolchain with all targets
-            (pkgs.rust-bin.stable.latest.default.override {
+
+            (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" "rust-analyzer" ];
               targets = [ "x86_64-pc-windows-gnu" "x86_64-unknown-linux-gnu" ];
             })
@@ -114,36 +119,8 @@
 
         # Cross-compilation development shells
         devShells = {
-          # Linux development shell
-          linux = pkgs.mkShell (mkBuildEnv "x86_64-linux" // {
-            buildInputs = with pkgs; [
-              pkg-config
-              openssl
-              libxkbcommon
-              wayland
-              valgrind
-            ];
-            LD_LIBRARY_PATH = "$LD_LIBRARY_PATH:${
-              with pkgs;
-              pkgs.lib.makeLibraryPath [
-                xorg.libX11 
-                xorg.libXcursor 
-                xorg.libXi 
-                libxkbcommon 
-                xorg.libxcb  
-                pkgs.vulkan-loader
-                pkgs.glfw
-              ]
-            }";
-          });
-
           # Windows cross-compilation shell
-          windows = pkgs.mkShell (mkBuildEnv "x86_64-windows" // {
-            buildInputs = with pkgs; [
-              pkg-config
-              openssl
-            ];
-          });
+          windows = pkgs.mkShell (mkBuildEnv "x86_64-windows");
         };
 
         packages = {
@@ -159,35 +136,17 @@
               openssl
               libxkbcommon
               wayland
+              glib
+              atk
+              gtk3
+              libappindicator
+              libayatana-appindicator
+              libnotify
             ];
             
             nativeBuildInputs = with pkgs; [
               pkg-config
-              cmake
             ];
-          };
-
-          # Cross-compiled packages
-          linux = let
-            env = mkBuildEnv "x86_64-linux";
-            pkgsCross = mkCrossPkgs "x86_64-linux";
-          in pkgsCross.rustPlatform.buildRustPackage {
-            pname = "clipboard-qr";
-            version = "0.1.0";
-            src = ./.;
-            cargoLock.lockFile = ./Cargo.lock;
-            
-            buildInputs = with pkgsCross; [
-              pkg-config
-              openssl
-              libxkbcommon
-              wayland
-            ];
-            
-            nativeBuildInputs = env.nativeBuildInputs;
-            
-            # Set environment variables
-            inherit (env) TARGET_CC CARGO_BUILD_TARGET CARGO_BUILD_RUSTFLAGS;
           };
 
           windows = let

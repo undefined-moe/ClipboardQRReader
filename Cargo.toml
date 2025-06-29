@@ -8,34 +8,37 @@ license = "MIT"
 
 [dependencies]
 # GUI framework for cross-platform development
-eframe = "0.26.0"
-egui = "0.26.0"
+eframe = "0.31.1"
+egui = "0.31.1"
 
 # QR code generation
 qrcode = "0.13.0"
 
 # QR code detection/scanning
-bardecoder = "0.4.0"
+bardecoder = "0.5.0"
 
 # Clipboard handling
-arboard = "3.3.0"
+arboard = "3.6.0"
 
 # Image handling
-image = "0.24.0"
+image = "0.24.9"
 
 # Error handling
-anyhow = "1.0.0"
-thiserror = "1.0.0"
+anyhow = "1.0.98"
+thiserror = "2.0.12"
 
 # Logging
-tracing = "0.1.0"
-tracing-subscriber = "0.3.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+
+# System tray
+tray-icon = "0.21"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.0", features = ["winuser", "wingdi", "winbase", "errhandlingapi", "libloaderapi"] }
+winapi = { version = "0.3.9", features = ["winuser", "wingdi", "winbase", "errhandlingapi", "libloaderapi"] }
 
 [target.'cfg(unix)'.dependencies]
-x11rb = "0.12.0"
+x11rb = "0.13.1"
 
 [profile.release]
 opt-level = 3
