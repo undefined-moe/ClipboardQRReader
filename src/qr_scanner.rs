@@ -1,5 +1,5 @@
 use bardecoder;
-use image::{ImageBuffer, Rgba, Luma, DynamicImage};
+use image::{ImageBuffer, Rgba, DynamicImage};
 use anyhow::Result;
 use tracing::{warn, debug};
 
@@ -78,20 +78,6 @@ impl QRScanner {
         }
     }
 
-    /// Convert RGBA image to Luma (grayscale) for better QR detection
-    fn convert_rgba_to_luma(&self, rgba_image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<ImageBuffer<Luma<u8>, Vec<u8>>> {
-        let mut luma_image = ImageBuffer::new(rgba_image.width(), rgba_image.height());
-        
-        for (x, y, pixel) in rgba_image.enumerate_pixels() {
-            // Convert RGBA to grayscale using standard luminance formula
-            let gray_value = (pixel[0] as u32 * 299 + pixel[1] as u32 * 587 + pixel[2] as u32 * 114) / 1000;
-            let luma_pixel = Luma([gray_value as u8]);
-            luma_image.put_pixel(x, y, luma_pixel);
-        }
-        
-        Ok(luma_image)
-    }
-
     /// Scan multiple QR codes from an image
     pub fn scan_multiple_qr_codes(&self, image: &ImageBuffer<Rgba<u8>, Vec<u8>>) -> Result<Vec<String>> {
         debug!("Scanning for multiple QR codes in image ({}x{})", image.width(), image.height());
@@ -139,30 +125,18 @@ mod tests {
     }
 
     #[test]
-    fn test_convert_rgba_to_luma() {
-        let scanner = QRScanner::new();
-        let mut rgba_image = ImageBuffer::new(10, 10);
-        
-        // Fill with white pixels
-        for pixel in rgba_image.pixels_mut() {
-            *pixel = Rgba([255, 255, 255, 255]);
-        }
-        
-        let luma_image = scanner.convert_rgba_to_luma(&rgba_image).unwrap();
-        assert_eq!(luma_image.width(), 10);
-        assert_eq!(luma_image.height(), 10);
-        
-        // Check that white pixels converted to appropriate grayscale
-        let center_pixel = luma_image.get_pixel(5, 5);
-        assert_eq!(center_pixel[0], 255); // Should be white in grayscale
-    }
-
-    #[test]
     fn test_has_qr_code_with_empty_image() {
         let scanner = QRScanner::new();
         let rgba_image = ImageBuffer::new(100, 100);
         
         let has_qr = scanner.has_qr_code(&rgba_image).unwrap();
         assert!(!has_qr);
+    }
+
+    #[test]
+    fn test_scan_qr_from_file_nonexistent() {
+        let scanner = QRScanner::new();
+        let result = scanner.scan_qr_from_file("nonexistent_file.png");
+        assert!(result.is_err());
     }
 } 

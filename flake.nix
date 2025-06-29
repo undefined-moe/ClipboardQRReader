@@ -52,7 +52,7 @@
               extensions = [ "rust-src" "rust-analyzer" ];
               targets = [ buildTarget.rustTarget ];
             })
-            pkgs.stdenv.cc
+            pkgsCross.stdenv.cc
           ];
 
           # Environment variables for cross-compilation

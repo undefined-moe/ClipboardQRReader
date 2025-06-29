@@ -1,66 +1,66 @@
-use eframe::egui;
 use anyhow::Result;
 use tracing::{info, error};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
-mod app;
 mod qr_generator;
 mod qr_scanner;
 mod clipboard_handler;
 mod cli;
+mod global_state;
 
-use app::ClipboardQRApp;
 use cli::ClipboardQRCLI;
+use clipboard_handler::ClipboardHandler;
+use global_state::GlobalClipboardState;
 
 fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt::init();
     info!("Starting Clipboard QR Application");
 
-    // Check if we're in a headless environment (only on Unix-like systems)
-    #[cfg(unix)]
-    {
-        if std::env::var("DISPLAY").is_err() && std::env::var("WAYLAND_DISPLAY").is_err() {
-            error!("No display server detected. Starting CLI mode.");
-            return run_cli_mode();
-        }
-    }
+    // Create global clipboard state
+    let clipboard_state = Arc::new(Mutex::new(GlobalClipboardState::new()));
+    let clipboard_state_clone = clipboard_state.clone();
 
-    // Try to run GUI mode
-    match run_gui_mode() {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("GUI mode failed: {}", e);
-            error!("Falling back to CLI mode...");
-            run_cli_mode()
+    // Start background clipboard monitoring thread
+    let _background_thread = thread::spawn(move || {
+        let mut clipboard_handler = ClipboardHandler::new();
+        info!("Background clipboard monitoring thread started");
+
+        loop {
+            // Check for clipboard changes
+            match clipboard_handler.get_data_if_changed() {
+                Ok(Some(new_data)) => {
+                    // Update global state
+                    if let Ok(mut state) = clipboard_state_clone.lock() {
+                        state.last_data = Some(new_data);
+                        state.has_changed = true;
+                    }
+                    info!("Clipboard data updated in background thread");
+                }
+                Ok(None) => {
+                    // No change, continue monitoring
+                }
+                Err(e) => {
+                    error!("Error checking clipboard: {}", e);
+                }
+            }
+
+            // Sleep to avoid excessive CPU usage
+            thread::sleep(Duration::from_millis(100));
         }
-    }
+    });
+
+    // Run CLI mode
+    info!("Starting CLI mode...");
+    run_cli_mode(clipboard_state)
 }
 
-fn run_gui_mode() -> Result<()> {
-    info!("Starting GUI mode...");
-    
-    // Set up the native options
-    let options = eframe::NativeOptions::default();
-
-    // Run the application
-    eframe::run_native(
-        "Clipboard QR",
-        options,
-        Box::new(|_cc| {
-            Box::new(ClipboardQRApp::new())
-        }),
-    ).map_err(|e| {
-        error!("Failed to start GUI application: {}", e);
-        anyhow::anyhow!("GUI initialization failed: {}. Please ensure you have a display server running.", e)
-    })?;
-
-    Ok(())
-}
-
-fn run_cli_mode() -> Result<()> {
+fn run_cli_mode(clipboard_state: Arc<Mutex<GlobalClipboardState>>) -> Result<()> {
     info!("Starting CLI mode...");
     
-    let mut cli = ClipboardQRCLI::new();
+    let mut cli = ClipboardQRCLI::new(clipboard_state);
     cli.run()?;
     
     Ok(())

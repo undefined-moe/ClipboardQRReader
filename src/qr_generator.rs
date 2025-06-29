@@ -8,14 +8,12 @@ use eframe::egui::ColorImage;
 
 pub struct QRGenerator {
     size: u32,
-    quiet_zone: u32,
 }
 
 impl QRGenerator {
     pub fn new() -> Self {
         Self {
             size: 300,
-            quiet_zone: 4,
         }
     }
 
