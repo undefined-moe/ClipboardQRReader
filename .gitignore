@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application specific
+/output/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+
+# Logs
+*.log
+
+# Nix
+result
+result-*
+.direnv/ 
