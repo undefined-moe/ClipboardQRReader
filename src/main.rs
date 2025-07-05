@@ -4,6 +4,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+#[cfg(unix)]
+use gtk;
+
 mod qr_generator;
 mod qr_scanner;
 mod clipboard_handler;
@@ -20,6 +23,16 @@ fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt::init();
     info!("Starting Clipboard QR Application");
+
+    // Initialize GTK on Unix systems
+    #[cfg(unix)]
+    {
+        if gtk::init().is_err() {
+            error!("Failed to initialize GTK");
+            return Err(anyhow::anyhow!("GTK initialization failed"));
+        }
+        info!("GTK initialized successfully");
+    }
 
     // Create global clipboard state
     let clipboard_state = Arc::new(Mutex::new(GlobalClipboardState::new()));

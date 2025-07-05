@@ -39,6 +39,7 @@ winapi = { version = "0.3.9", features = ["winuser", "wingdi", "winbase", "errha
 
 [target.'cfg(unix)'.dependencies]
 x11rb = "0.13.1"
+gtk = "0.18.2"
 
 [profile.release]
 opt-level = 3
