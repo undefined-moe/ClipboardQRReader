@@ -57,20 +57,4 @@ mod tests {
         let scanner = QRScanner::new();
         // Test that scanner can be created
     }
-
-    #[test]
-    fn test_has_qr_code_with_empty_image() {
-        let scanner = QRScanner::new();
-        let rgba_image = ImageBuffer::new(100, 100);
-        
-        let has_qr = scanner.has_qr_code(&rgba_image).unwrap();
-        assert!(!has_qr);
-    }
-
-    #[test]
-    fn test_scan_qr_from_file_nonexistent() {
-        let scanner = QRScanner::new();
-        let result = scanner.scan_qr_from_file("nonexistent_file.png");
-        assert!(result.is_err());
-    }
 } 

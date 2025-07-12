@@ -117,42 +117,49 @@ impl QRGenerator {
 
         let code = QrCode::new(text)?;
         let string = code.render()
-            .dark_color('█')
-            .light_color(' ')
+            .dark_color(' ')
+            .light_color('█')
             .build();
         
-        // Convert to smaller Unicode blocks using half-block characters
+        // 使用 Unicode 块字符压缩显示
         let lines: Vec<&str> = string.lines().collect();
-        let mut small_string = String::new();
+        let mut compressed_lines = Vec::new();
         
-        // Process lines in pairs to create smaller blocks
+        // 每两行合并为一行，使用上半个块和下半个块
         for i in (0..lines.len()).step_by(2) {
-            let line1 = lines.get(i).unwrap_or(&"");
-            let line2 = lines.get(i + 1).unwrap_or(&"");
-            
-            let mut combined_line = String::new();
-            let max_len = line1.chars().count().max(line2.chars().count());
-            
-            for j in 0..max_len {
-                let c1 = line1.chars().nth(j).unwrap_or(' ');
-                let c2 = line2.chars().nth(j).unwrap_or(' ');
+            if i + 1 < lines.len() {
+                let top_line = lines[i];
+                let bottom_line = lines[i + 1];
                 
-                let combined_char = match (c1, c2) {
-                    ('█', '█') => '█', // Full block
-                    ('█', ' ') => '▀', // Upper half block
-                    (' ', '█') => '▄', // Lower half block
-                    (' ', ' ') => ' ', // Space
-                    _ => ' ',          // Default to space
-                };
-                
-                combined_line.push(combined_char);
+                let mut compressed_line = String::new();
+                for (top_char, bottom_char) in top_line.chars().zip(bottom_line.chars()) {
+                    let block_char = match (top_char, bottom_char) {
+                        ('█', '█') => '█',    // 全黑
+                        (' ', ' ') => ' ',    // 全白
+                        ('█', ' ') => '▀',    // 上黑下白
+                        (' ', '█') => '▄',    // 上白下黑
+                        _ => ' ',             // 默认白色
+                    };
+                    compressed_line.push(block_char);
+                }
+                compressed_lines.push(compressed_line);
+            } else {
+                // 处理最后一行（如果总行数是奇数）
+                let top_line = lines[i];
+                let mut compressed_line = String::new();
+                for top_char in top_line.chars() {
+                    let block_char = if top_char == '█' { '▀' } else { ' ' };
+                    compressed_line.push(block_char);
+                }
+                compressed_lines.push(compressed_line);
             }
-            
-            small_string.push_str(&combined_line);
-            small_string.push('\n');
         }
         
-        println!("{}", small_string);
+        // 打印压缩后的 QR 码
+        for line in compressed_lines {
+            println!("{}", line);
+        }
+        
         Ok(())
     }
 } 

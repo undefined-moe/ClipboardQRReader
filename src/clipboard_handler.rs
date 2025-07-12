@@ -185,23 +185,166 @@ impl ClipboardHandler {
 
     #[cfg(unix)]
     fn start_linux_clipboard_listener() -> (Option<mpsc::Receiver<()>>, Option<thread::JoinHandle<()>>) {
-        // For Linux, we'll use a simple polling approach in a background thread
-        // since X11 clipboard events are more complex to implement
+        use std::time::Duration;
+        use std::env;
         let (tx, rx) = mpsc::channel();
+
+        // Wayland: 直接轮询
+        if env::var_os("WAYLAND_DISPLAY").is_some() {
+            let handle = thread::spawn(move || {
+                loop {
+                    thread::sleep(Duration::from_millis(100));
+                    if let Err(e) = tx.send(()) {
+                        warn!("Failed to send clipboard check signal: {}", e);
+                        break;
+                    }
+                }
+            });
+            return (Some(rx), Some(handle));
+        }
+
+        use x11rb::connection::Connection;
+        use x11rb::protocol::xproto::{ConnectionExt, WindowClass};
+        use x11rb::protocol::Event;
         
-        let handle = thread::spawn(move || {
-            use std::time::Duration;
-            
-            info!("Linux clipboard polling thread started");
-            
+        let (conn, screen_num) = match x11rb::connect(None) {
+            Ok((conn, screen_num)) => (conn, screen_num),
+            Err(e) => {
+                warn!("Failed to connect to X11 server: {}. Falling back to polling.", e);
+                // Fall back to polling approach
+                loop {
+                    thread::sleep(Duration::from_millis(100));
+                    if let Err(e) = tx.send(()) {
+                        warn!("Failed to send clipboard check signal: {}", e);
+                        break;
+                    }
+                }
+                return (Some(rx), None);
+            },
+        };
+
+        let screen = &conn.setup().roots[screen_num];
+        let root = screen.root;
+        
+        // Get atoms for clipboard
+        let clipboard_atom = match conn.intern_atom(false, b"CLIPBOARD") {
+            Ok(reply) => reply.reply().unwrap().atom,
+            Err(e) => {
+                warn!("Failed to get CLIPBOARD atom: {}. Falling back to polling.", e);
+                loop {
+                    thread::sleep(Duration::from_millis(100));
+                    if let Err(e) = tx.send(()) {
+                        warn!("Failed to send clipboard check signal: {}", e);
+                        break;
+                    }
+                }
+                return (Some(rx), None);
+            },
+        };
+        
+        let targets_atom = match conn.intern_atom(false, b"TARGETS") {
+            Ok(reply) => reply.reply().unwrap().atom,
+            Err(e) => {
+                warn!("Failed to get TARGETS atom: {}. Falling back to polling.", e);
+                loop {
+                    thread::sleep(Duration::from_millis(100));
+                    if let Err(e) = tx.send(()) {
+                        warn!("Failed to send clipboard check signal: {}", e);
+                        break;
+                    }
+                }
+                return (Some(rx), None);
+            },
+        };
+
+        // Create a window to receive selection events
+        let window = match conn.generate_id() {
+            Ok(id) => id,
+            Err(e) => {
+                warn!("Failed to generate window ID: {}. Falling back to polling.", e);
+                loop {
+                    thread::sleep(Duration::from_millis(100));
+                    if let Err(e) = tx.send(()) {
+                        warn!("Failed to send clipboard check signal: {}", e);
+                        break;
+                    }
+                }
+                return (Some(rx), None);
+            },
+        };
+
+        // Create the window
+        if let Err(e) = conn.create_window(
+            0, // depth
+            window,
+            root,
+            0, 0, // x, y
+            1, 1, // width, height
+            0, // border_width
+            WindowClass::COPY_FROM_PARENT, // class - use COPY_FROM_PARENT instead of InputOutput
+            0, // visual
+            &x11rb::protocol::xproto::CreateWindowAux::new(), // value_list
+        ) {
+            warn!("Failed to create window: {}. Falling back to polling.", e);
             loop {
-                // Sleep for a short time to avoid excessive CPU usage
                 thread::sleep(Duration::from_millis(100));
-                
-                // Send a signal to check clipboard (this will be handled by the main thread)
                 if let Err(e) = tx.send(()) {
                     warn!("Failed to send clipboard check signal: {}", e);
                     break;
+                }
+            }
+            return (Some(rx), None);
+        }
+
+        // Select for selection change events
+        if let Err(e) = conn.change_window_attributes(
+            window,
+            &x11rb::protocol::xproto::ChangeWindowAttributesAux::new()
+                .event_mask(x11rb::protocol::xproto::EventMask::NO_EVENT),
+        ) {
+            warn!("Failed to set window attributes: {}. Falling back to polling.", e);
+            loop {
+                thread::sleep(Duration::from_millis(100));
+                if let Err(e) = tx.send(()) {
+                    warn!("Failed to send clipboard check signal: {}", e);
+                    break;
+                }
+            }
+            return (Some(rx), None);
+        }
+
+        info!("Linux X11 clipboard listener started successfully");
+        
+        // Event loop
+        let handle = thread::spawn(move || {
+            loop {
+                match conn.wait_for_event() {
+                    Ok(event) => {
+                        match event {
+                            Event::SelectionNotify(_) => {
+                                // Selection changed, notify main thread
+                                if let Err(e) = tx.send(()) {
+                                    warn!("Failed to send clipboard notification: {}", e);
+                                    break;
+                                }
+                            },
+                            _ => {
+                                // Ignore other events
+                            },
+                        }
+                    },
+                    Err(e) => {
+                        warn!("Error waiting for X11 event: {}. Falling back to polling.", e);
+                        // Fall back to polling
+                        loop {
+                            thread::sleep(Duration::from_millis(100));
+                            if let Err(e) = tx.send(()) {
+                                warn!("Failed to send clipboard check signal: {}", e);
+                                break;
+                            }
+                        }
+                        break;
+                    },
                 }
             }
         });
